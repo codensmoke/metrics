@@ -1,0 +1,136 @@
+[%
+# How many shards we have for each service. Note that Redis expects to be
+# an even number for main/replica pairing.
+DEFAULT redis_count = 6,
+        pg_count = 2;
+
+# This is where it gets interesting: each of our services
+# is defined as a name, a source, and some options. The same
+# source can power multiple service instances, e.g. CR/VR for
+# clientdb.
+DEFAULT service_list = [
+ # Main API endpoint exposes websockets via nginx
+ { name => 'api', ports => [ 80 ], networks => [ 'database' ] }
+];
+
+REDIS_INDICES = [ 0 .. redis_count ];
+CALL REDIS_INDICES.pop();
+PG_INDICES = [ 0 .. pg_count ];
+CALL PG_INDICES.pop();
+
+-%]
+version: "3.2"
+
+services:
+  # DataDog Agent
+  datadog:
+    image: docker.io/datadog/agent:7
+    environment:
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_HOSTNAME=${DD_HOSTNAME}
+      - DD_LOG_LEVEL=INFO
+      - DD_DOGSTATSD_NON_LOCAL_TRAFFIC=true
+    networks:
+      - stats
+
+[% IF incl_stats -%]
+# Stats collection, monitoring and alerting
+
+  # Prometheus stats collecting
+  prometheus:
+    image: prom/prometheus:v2.35.0
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    ports:
+      - 9090
+    networks:
+      - stats
+
+  # For any short lived scripts
+  # Or any components we don't have exporter for.
+  pushgateway:
+    image: prom/pushgateway:v1.4.2
+    restart: unless-stopped
+    ports:
+      - 9091
+    networks:
+      - stats
+
+  # Grafana dashboards
+  grafana:
+    image: grafana/grafana:8.5.0
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-devtest}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+    ports:
+      - 3000
+    networks:
+      - stats
+
+  # Host system information exporter
+  nodeexporter:
+    image: prom/node-exporter:v1.3.1
+    user: root
+    privileged: true
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    restart: unless-stopped
+    ports:
+      - 9100
+    networks:
+      - stats
+
+  # Docker system information exporter
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.44.0
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
+    restart: unless-stopped
+    ports:
+      - 8080
+    networks:
+      - stats
+
+  # Redis exporter to be added.
+
+# End stats containers
+[% END -%]
+
+volumes:
+[% IF incl_stats -%]
+  prometheus_data:
+  grafana_data:
+[% END -%]
+
+networks:
+  stats:
+
