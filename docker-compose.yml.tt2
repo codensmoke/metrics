@@ -133,4 +133,5 @@ volumes:
 
 networks:
   stats:
+    driver: bridge
 
