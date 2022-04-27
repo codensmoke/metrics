@@ -50,7 +50,7 @@ services:
       - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     restart: unless-stopped
-    ports:
+    expose:
       - 9090
     networks:
       - stats
@@ -60,7 +60,7 @@ services:
   pushgateway:
     image: prom/pushgateway:v1.4.2
     restart: unless-stopped
-    ports:
+    expose:
       - 9091
     networks:
       - stats
@@ -77,7 +77,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-devtest}
       - GF_USERS_ALLOW_SIGN_UP=false
     restart: unless-stopped
-    ports:
+    expose:
       - 3000
     networks:
       - stats
@@ -97,7 +97,7 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     restart: unless-stopped
-    ports:
+    expose:
       - 9100
     networks:
       - stats
@@ -115,7 +115,7 @@ services:
       - /var/lib/docker:/var/lib/docker:ro
       #- /cgroup:/cgroup:ro #doesn't work on MacOS only for Linux
     restart: unless-stopped
-    ports:
+    expose:
       - 8080
     networks:
       - stats
