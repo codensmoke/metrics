@@ -120,6 +120,18 @@ services:
     networks:
       - statstraffic
 
+  # Cloudflare exporter
+  cloudflare-exporter:
+    image: lablabs/cloudflare_exporter:0.0.10
+    restart: unless-stopped
+    environment:
+      - CF_API_TOKEN=${CF_API_TOKEN:-na}
+    expose:
+      - 8080
+    networks:
+      - statstraffic
+    
+
   # Redis exporter to be added.
 
 # End stats containers

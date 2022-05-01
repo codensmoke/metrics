@@ -34,10 +34,15 @@ scrape_configs:
     static_configs:
       - targets: ['pushgateway:9091']
 
+  - job_name: 'cloudflare'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['cloudflare-exporter:8080']
+
   - job_name: 'caddy'
     scrape_interval: 15s
     static_configs:
-      - targets: ['caddy-config_caddy_1:2019']
+      - targets: ['caddy-config_caddy_1:2020']
 
   - job_name: 'rocket_chat_app'
     scrape_interval: 15s
